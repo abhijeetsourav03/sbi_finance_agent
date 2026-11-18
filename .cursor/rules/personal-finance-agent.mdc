@@ -1,0 +1,46 @@
+---
+description: Development guidelines for the personal finance AI agent
+alwaysApply: true
+---
+
+# Project: Personal Finance AI Agent
+
+## Objective
+Build a local-first personal finance agent that retrieves
+bank statements from Gmail, analyzes historical expenditure,
+and generates personalized monthly budgets.
+
+## Technology
+- Python 3.12
+- Gmail API and OAuth 2.0
+- Pandas
+- SQLite
+- Ollama
+- Streamlit
+
+## Development principles
+1. Use modular Python architecture.
+2. Keep Gmail integration separate from financial analytics.
+3. Never hardcode credentials or API keys.
+4. Use environment variables for configuration.
+5. Use type hints and meaningful docstrings.
+6. Implement logging and exception handling.
+7. Avoid duplicate transaction processing.
+8. Validate financial calculations.
+9. Keep bank statements and transaction data local.
+10. Never initiate financial transactions.
+
+## Development workflow
+- Implement one phase at a time.
+- Do not rewrite working modules unnecessarily.
+- Preserve existing functionality.
+- Write testable functions.
+- Add unit tests for important calculations.
+- Explain dependencies before introducing them.
+
+```python
+# Credentials come from the environment, never from source.
+import os
+
+client_id = os.environ["GMAIL_CLIENT_ID"]
+```
