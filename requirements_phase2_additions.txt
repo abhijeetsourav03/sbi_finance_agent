@@ -1,0 +1,6 @@
+# Add to requirements_phase2.txt (all already used by Phase 1/2 or the OCR fallback)
+pymupdf
+pandas
+opencv-python
+pytesseract
+pytest
