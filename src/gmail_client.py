@@ -46,6 +46,20 @@ def safe_filename(filename):
     return name[:140] or "attachment"
 
 
+def statement_filename(filename):
+    """Extract statement month from the last 8 digits (DDMMYYYY)."""
+    match = re.search(r"(\d{8})$", Path(filename).stem)
+
+    if not match:
+        return None
+
+    try:
+        statement_date = datetime.strptime(match.group(1), "%d%m%Y")
+    except ValueError:
+        return None
+
+    return f"SBI_{statement_date:%Y-%m}.pdf"
+
 def walk_parts(payload):
     for part in payload.get("parts", []) or []:
         yield part
@@ -129,12 +143,23 @@ def download_attachments_for_message(service, message_id, manifest):
 
         file_bytes = base64.urlsafe_b64decode(encoded.encode("utf-8"))
         STATEMENTS_DIR.mkdir(parents=True, exist_ok=True)
-        output_name = f"{message_id[:12]}_{filename}"
+        output_name = (
+            statement_filename(filename)
+            if ext == ".pdf"
+            else None
+        ) or f"{message_id[:12]}_{filename}"
+
         output_path = STATEMENTS_DIR / output_name
 
         # Never overwrite an existing local file.
         if output_path.exists():
-            output_path = STATEMENTS_DIR / f"{message_id[:12]}_copy_{filename}"
+            stem = Path(output_name).stem
+            suffix = Path(output_name).suffix
+            counter = 2
+
+            while output_path.exists():
+                output_path = STATEMENTS_DIR / f"{stem}_{counter}{suffix}"
+                counter += 1
 
         output_path.write_bytes(file_bytes)
 
