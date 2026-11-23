@@ -1,71 +1,121 @@
-# SBI Finance Agent — Phase 1 (Gmail statement fetcher)
+# SBI Finance Agent — Phase 1 & Phase 2 v2
 
-## What this phase does
-- Authenticates to Gmail using a Desktop OAuth client.
-- Uses Gmail's read-only scope.
-- Searches messages using a configurable Gmail query.
-- Downloads PDF, CSV, XLS and XLSX attachments.
-- Avoids re-downloading the same message attachment using a local manifest.
-- Does not send, delete, archive, label or modify email.
+Automatically fetch SBI bank statements from Gmail, decrypt and validate Excel files, consolidate transactions, and generate a categorized transaction workbook.
 
-## Windows 11 + Cursor setup
+## 1. Setup
 
-Open this folder in Cursor. Open Terminal → New Terminal (PowerShell), then run:
+Activate the virtual environment:
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
+.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```powershell
 pip install -r requirements.txt
-Copy-Item .env.example .env
+pip install -r requirements-v2.txt
 ```
 
-If activation is blocked in this terminal session:
+Configure `.env`:
+
+```env
+GMAIL_QUERY="from:yonobysbi@alerts.sbi.bank.in has:attachment {filename:xlsx filename:xls filename:csv}"
+
+SBI_EXCEL_PASSWORD_1="your_password_1"
+SBI_EXCEL_PASSWORD_2="your_password_2"
+```
+
+Gmail API credentials must already be configured for the Gmail fetcher. On first use, complete the Google OAuth authorization if prompted.
+
+## 2. Processing Flow
+
+```text
+Gmail Inbox
+    |
+    v
+Fetch SBI Statement Attachments
+(src/main.py)
+    |
+    v
+Encrypted SBI Excel Statements
+(data/raw/)
+    |
+    v
+Excel Decryption
+(src/excel_reader.py)
+    |
+    v
+Transaction Extraction & Validation
+(src/sbi_transaction_extractor.py)
+    |
+    v
+Master Transaction Consolidation
+(src/master_transaction_builder.py)
+    |
+    v
+Transaction Categorization
+(src/transaction_categorizer.py)
+    |
+    v
+Categorized Transactions
+(data/processed/sbi_categorized_transactions.xlsx)
+```
+
+## 3. Run the Pipeline
+
+Run these commands from the project root, in order.
+
+**Step 1 — Fetch SBI statements from Gmail**
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
+python -m src.main
 ```
 
-In Cursor, select the interpreter at `.venv\Scripts\python.exe` if it does not select automatically.
+Downloads matching SBI Excel attachments from Gmail.
 
-## Google Cloud OAuth setup
-
-1. Go to https://console.cloud.google.com/ and create a project.
-2. Enable **Gmail API** under APIs & Services → Library.
-3. Configure Google Auth Platform / OAuth consent screen. For a personal Gmail account, choose External if required, and add your own Gmail address as a test user while the app is in Testing.
-4. Under Google Auth Platform → Clients (or APIs & Services → Credentials), create an OAuth Client ID with application type **Desktop app**.
-5. Download the JSON and put it in this project root named exactly `credentials.json`.
-6. Do not share this file or `token.json`. They are credentials.
-
-Google's official Python quickstart: https://developers.google.com/workspace/gmail/api/quickstart/python
-
-## Configure the Gmail query
-
-Edit `.env`. The initial query `from:(sbi) has:attachment` is only a starting point and may match irrelevant messages or miss your bank's statement email.
-
-First, search your Gmail manually for SBI statement emails and inspect the actual sender and subject. Then narrow the query, for example:
-
-`GMAIL_QUERY=from:actual-sender@example.com has:attachment filename:pdf`
-
-Replace the example address with the real sender shown in your own email. Gmail search syntax: https://support.google.com/mail/answer/7190
-
-## Run
+**Step 2 — Generate master transactions**
 
 ```powershell
-python -m src.main --max-results 15
+python -m src.master_transaction_builder
 ```
 
-On first run a browser window opens. Sign in to the Gmail account receiving the SBI statement and approve read-only access. Attachments are saved under `data/raw_statements/`; `data/manifest.json` records metadata and deduplication keys.
+Decrypts statements, extracts and validates transactions, and consolidates overlapping statements.
 
-You can override the query for one run:
+Output: `data/processed/sbi_master_transactions.xlsx`
+
+**Step 3 — Categorize transactions**
 
 ```powershell
-python -m src.main --query "from:actual-sender@example.com has:attachment" --max-results 10
+python -m src.transaction_categorizer
 ```
 
-## Security notes
-- Keep `.env`, `credentials.json`, `token.json`, and `data/` out of Git and cloud-shared folders.
-- This code only requests `gmail.readonly`.
-- The downloaded bank statements are sensitive. Keep this project on a trusted, encrypted Windows account/device.
-- This is a local development prototype, not a production security review.
+Applies the custom categorization rules.
+
+Output: `data/processed/sbi_categorized_transactions.xlsx`
+
+
+## 4. Final Output
+
+`data/processed/sbi_categorized_transactions.xlsx`
+
+The **Categorized Transactions** worksheet contains seven columns:
+
+| Column | Description |
+|---|---|
+| date | Transaction date |
+| daily_txn | Daily transaction sequence |
+| transaction_type | Expense, Trading, Loan, Transfer, etc. |
+| category | Assigned category |
+| credit | Amount received |
+| debit | Amount sent |
+| balance | Account balance |
+
+Additional worksheets provide monthly category totals, transactions needing review, and an overview.
+
+## 5. Notes
+
+- Run the three commands in sequence whenever you want to refresh the transaction data.
+- Overlapping statements are consolidated to avoid duplicate transactions.
+- Unclassified transactions remain available for review.
+- Never commit `.env`, Gmail credentials, bank statements, or generated financial data to Git.
