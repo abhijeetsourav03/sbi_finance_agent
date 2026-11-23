@@ -45,6 +45,7 @@ def normalize_description(value):
     return re.sub(r"\s+", " ", str(value)).upper().strip()
 
 
+
 def classify_transaction(row):
     """
     Classify transactions according to user-defined rules.
@@ -109,7 +110,18 @@ def classify_transaction(row):
             "Needs Review",
         )
 
-    # 5. Netbanking
+    # 5. ATM cash withdrawals
+    if debit > 0 and (
+        "ATM WDL" in description
+        or "ATM CASH" in description
+    ):
+        return (
+            "Expense",
+            "ATM - Cash Withdrawal",
+            "User Rule",
+        )
+
+    # 6. Netbanking
     if any(
         keyword in description
         for keyword in NETBANKING_KEYWORDS
@@ -120,7 +132,7 @@ def classify_transaction(row):
             "Needs Review",
         )
 
-    # 6. All remaining UPI debits = daily expenses
+    # 7. All remaining UPI debits = daily expenses
     if "UPI" in description:
         if debit > 0:
             return (
@@ -135,7 +147,7 @@ def classify_transaction(row):
             "Needs Review",
         )
 
-    # 7. Remaining transactions
+    # 8. Remaining debit transactions
     if debit > 0:
         return (
             "Debit - Unclassified",
@@ -143,12 +155,12 @@ def classify_transaction(row):
             "Needs Review",
         )
 
+    # 9. Remaining credit transactions
     return (
         "Credit - Unclassified",
         "Other",
         "Needs Review",
     )
-
 
 
 
